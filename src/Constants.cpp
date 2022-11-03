@@ -99,5 +99,7 @@ const char *CMD_OPTION_DESCRIPTION_PB = "Enable pre-blocking.";
 const char *CMD_OPTION_STATS = "stats";
 const char *CMD_OPTION_DESCRIPTION_STATS = "Print runtime and various statistics.";
 
+const char *CMD_OPTION_IPUMA = "ipuma";
+const char *CMD_OPTION_DESCRIPTION_IPUMA = "Use ipuma.";
 }
 

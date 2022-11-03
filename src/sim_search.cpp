@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "../inc/align/IPumaAligner.hpp"
 #include "../inc/align/AdeptBSWAligner.hpp"
 #include "../inc/align/PWAlign.hpp"
 #include "../inc/align/SeqanFullAligner.hpp"
@@ -127,6 +128,8 @@ mult_aln_bl_idx
 		else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
+		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
 
 		parops->tp->start_timer("construct-seqs");
 		
@@ -348,6 +351,8 @@ mult_aln_bl_idx_ovlp
 		else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
+		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
 
 		parops->tp->start_timer("construct-seqs");
 
@@ -567,9 +572,11 @@ mult_aln_bl_trg
 				(params.gap_open, params.gap_ext, params.klength,
 				 params.aln_seqan_xdrop, params.seed_count);			
 #ifdef ADEPT_ENABLED
-	    else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
+	    	else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
+		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
 
 				
 		parops->tp->start_timer("construct-seqs");
@@ -782,9 +789,11 @@ mult_aln_bl_trg_ovlp
 				(params.gap_open, params.gap_ext, params.klength,
 				 params.aln_seqan_xdrop, params.seed_count);
 #ifdef ADEPT_ENABLED
-	    else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
+	    	else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
+		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
 				
 		parops->tp->start_timer("construct-seqs");
 		
@@ -1001,6 +1010,8 @@ mult_aln
 		else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
+		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
 
 		parops->tp->start_timer("sim:construct_seqs");
 

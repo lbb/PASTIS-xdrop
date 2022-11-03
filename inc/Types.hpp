@@ -57,7 +57,8 @@ params_t
 			ALN_SEQAN_FULL,
 			ALN_SEQAN_XDROP,
 			ALN_SEQAN_BANDED,
-			ALN_ADEPT_GPUBSW
+			ALN_ADEPT_GPUBSW,
+			ALN_IPUMA
 		};
 	std::string	align_file;
 	int			afreq;

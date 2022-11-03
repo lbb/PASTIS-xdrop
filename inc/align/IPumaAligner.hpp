@@ -5,6 +5,13 @@
 #include <vector>
 #include <thread>
 
+#include <plog/Log.h>
+#include <plog/Initializers/RollingFileInitializer.h>
+#include <plog/Appenders/ColorConsoleAppender.h>
+#include <plog/Formatters/TxtFormatter.h>
+
+
+
 #include "PWAlign.hpp"
 #include "../../ipuma-lib/src/driver.hpp"
 #include "../../ipuma-lib/src/swatlib/vector.hpp"
@@ -24,6 +31,10 @@ class
 
  public:
   IPumaAligner(int gap_open, int gap_ext, uint32_t bsz = 1e6) : PWAlign(), g_batch_sz_(bsz) {
+      static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
+      plog::init(plog::debug, &consoleAppender);
+
+    
     this->gaps_ = std::make_tuple<>(gap_open, gap_ext);
 
     // init_single_ipu(SW_CONFIGURATION, ALGO_CONFIGURATION);

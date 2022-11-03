@@ -12,6 +12,7 @@
 [submodule "ipuma-lib"]
 	path = ipuma-lib
 	url = https://github.com/xiamaz/ipuma-lib.git
-[submodule "build/plog"]
-	path = build/plog
-	url = git@github.com:SergiusTheBest/plog.git
+	branch = xdrop
+[submodule "plog"]
+	path = plog
+	url = https://github.com/CergiusTheBest/plog.git

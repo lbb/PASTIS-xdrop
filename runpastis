@@ -35,7 +35,7 @@ cd ./build/
 
 # IPU
 srun --mpi=pmi2 -n $SLURM_NTASKS --ntasks 1 -- \
-	./pastis -i /global/D1/projects/ipumer/datasets/metaclust/metaclust50_500K.fasta -c 500000 --af sim_mat.mtx --ckthr 1 --absw
+	./pastis -i /global/D1/projects/ipumer/datasets/metaclust/metaclust50_500K.fasta -c 500000 --af sim_mat.mtx --ckthr 1 --ipuma
 
 
 # CPU

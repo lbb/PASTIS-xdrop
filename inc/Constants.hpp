@@ -102,4 +102,7 @@ extern const char *CMD_OPTION_DESCRIPTION_PB;
 extern const char *CMD_OPTION_STATS;
 extern const char *CMD_OPTION_DESCRIPTION_STATS;
 
+extern const char *CMD_OPTION_IPUMA;
+extern const char *CMD_OPTION_DESCRIPTION_IPUMA;
+
 }

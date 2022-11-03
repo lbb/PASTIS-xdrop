@@ -164,7 +164,8 @@ parse_args
 	(pastis::CMD_OPTION_LB, pastis::CMD_OPTION_DESCRIPTION_LB,
      cxxopts::value<string>())
 	(pastis::CMD_OPTION_PB, pastis::CMD_OPTION_DESCRIPTION_PB)
-	(pastis::CMD_OPTION_STATS, pastis::CMD_OPTION_DESCRIPTION_STATS);
+	(pastis::CMD_OPTION_STATS, pastis::CMD_OPTION_DESCRIPTION_STATS)
+	(pastis::CMD_OPTION_IPUMA, pastis::CMD_OPTION_DESCRIPTION_IPUMA);
 
 	// defaults
 	params.write_overlaps	   = false;
@@ -283,6 +284,9 @@ parse_args
 #else
 	throw std::runtime_error("Not build with ADEPT");
 #endif
+  	if (result.count(pastis::CMD_OPTION_IPUMA)) {
+		params.pw_aln = pastis::params_t::PwAln::ALN_IPUMA;
+	}
 
   	if (result.count(pastis::CMD_OPTION_ALPH))
 	{
@@ -386,7 +390,7 @@ params_to_str
 		"Overlap file (--of)",
 		"Alignment file (--af)",
 		"Alignment write frequency (--afreq)",
-		"Pairwise seq aligner (--na | --sfa | --sxa | --sba | -absw)",
+		"Pairwise seq aligner (--na | --sfa | --sxa | --sba | --absw | --ipuma)",
 		"Index map (--idxmap)",
 		"Alphabet (--alph)",
 		"Use substitute kmers (--subs)",
@@ -419,6 +423,9 @@ params_to_str
 			to_string(params.aln_seqan_banded_hw) + ")";
 	else if (params.pw_aln == pastis::params_t::PwAln::ALN_ADEPT_GPUBSW)
 		aln_str = "ADEPT BSW (GPU)";
+	else if (params.pw_aln == pastis::params_t::PwAln::ALN_IPUMA)
+		aln_str = "IPUMA (IPU)";
+
 
 	vector<string> vals = {
 		params.input_file,
@@ -542,7 +549,8 @@ main
 
 	if (params.pw_aln == pastis::params_t::PwAln::ALN_NONE ||
 		params.pw_aln == pastis::params_t::PwAln::ALN_SEQAN_FULL ||
-		params.pw_aln == pastis::params_t::PwAln::ALN_ADEPT_GPUBSW)
+		params.pw_aln == pastis::params_t::PwAln::ALN_ADEPT_GPUBSW ||
+		params.pw_aln == pastis::params_t::PwAln::ALN_IPUMA)
 		pastis::compute_sim_mat<pastis::CommonKmerLight>(params);
 	else if (params.pw_aln == pastis::params_t::PwAln::ALN_SEQAN_XDROP)
 		pastis::compute_sim_mat<pastis::CommonKmerLoc>(params);
