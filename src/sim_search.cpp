@@ -123,8 +123,10 @@ mult_aln_bl_idx
 			pwa = new SeqanXdropAligner
 				(params.gap_open, params.gap_ext, params.klength,
 				 params.aln_seqan_xdrop, params.seed_count);
+#ifdef ADEPT_ENABLED
 		else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
+#endif
 
 		parops->tp->start_timer("construct-seqs");
 		
@@ -342,8 +344,10 @@ mult_aln_bl_idx_ovlp
 			pwa = new SeqanXdropAligner
 				(params.gap_open, params.gap_ext, params.klength,
 				 params.aln_seqan_xdrop, params.seed_count);
+#ifdef ADEPT_ENABLED
 		else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
+#endif
 
 		parops->tp->start_timer("construct-seqs");
 
@@ -561,9 +565,12 @@ mult_aln_bl_trg
 		else if (params.pw_aln == params_t::PwAln::ALN_SEQAN_XDROP)
 			pwa = new SeqanXdropAligner
 				(params.gap_open, params.gap_ext, params.klength,
-				 params.aln_seqan_xdrop, params.seed_count);
+				 params.aln_seqan_xdrop, params.seed_count);			
+#ifdef ADEPT_ENABLED
 	    else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
+#endif
+
 				
 		parops->tp->start_timer("construct-seqs");
 		
@@ -774,8 +781,10 @@ mult_aln_bl_trg_ovlp
 			pwa = new SeqanXdropAligner
 				(params.gap_open, params.gap_ext, params.klength,
 				 params.aln_seqan_xdrop, params.seed_count);
+#ifdef ADEPT_ENABLED
 	    else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
+#endif
 				
 		parops->tp->start_timer("construct-seqs");
 		
@@ -988,8 +997,10 @@ mult_aln
 			pwa = new SeqanXdropAligner
 				(params.gap_open, params.gap_ext, params.klength,
 				 params.aln_seqan_xdrop, params.seed_count);
+#ifdef ADEPT_ENABLED	
 		else if (params.pw_aln == params_t::PwAln::ALN_ADEPT_GPUBSW)
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
+#endif
 
 		parops->tp->start_timer("sim:construct_seqs");
 

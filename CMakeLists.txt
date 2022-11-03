@@ -1,19 +1,19 @@
 cmake_minimum_required(VERSION 3.11)
-project(pastis LANGUAGES C CXX CUDA)
+project(pastis LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 14)
 
+include_directories("plog/include")
 include_directories(
 	${PROJECT_SOURCE_DIR}/seqan/include 
 	${PROJECT_SOURCE_DIR}/CombBLAS/install/include
 	${PROJECT_SOURCE_DIR}/CombBLAS/Applications
-	${PROJECT_SOURCE_DIR}/ADEPT
-	)
+    ${PROJECT_SOURCE_DIR}/ipuma-lib/src
+    ${PROJECT_SOURCE_DIR}/ipuma-lib
+)
 
-link_directories(
-    ${PROJECT_SOURCE_DIR}/CombBLAS/install/lib
-    ${PROJECT_SOURCE_DIR}/ADEPT/build/adept
-    )
 
+link_directories(${PROJECT_SOURCE_DIR}/CombBLAS/install/lib)
+    
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -31,25 +31,35 @@ add_executable(pastis
 	${PASTIS_CXX_INCS}
 	)
 
+add_subdirectory(ipuma-lib)
+
 # target_link_libraries(pastis PRIVATE -fsanitize=address)
-target_link_libraries(pastis PUBLIC CombBLAS GraphGenlib Usortlib)
+target_link_libraries(pastis PUBLIC CombBLAS GraphGenlib Usortlib IPUMA_LIBRARY)
 if (MPI_FOUND)
 	message(STATUS "MPI found.")
     include_directories(${MPI_INCLUDE_PATH})
     target_link_libraries(pastis PUBLIC ${MPI_LIBRARIES})
 endif()
 
-find_library(CUDART_LIBRARY cudart ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-if (CUDA_FOUND)
-	message(STATUS "Cuda found...")
-endif()
-message(STATUS "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
-message(STATUS "${CUDART_LIBRARY}")
-target_include_directories(pastis PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-target_link_libraries(pastis PUBLIC ${CUDART_LIBRARY})
+include(CheckLanguage)
+check_language(CUDA)
+if (CUDA_FOUND AND CMAKE_CUDA_COMPILER_LOADED)
+    add_compile_definitions(ADEPT_ENABLED)
+    find_library(CUDART_LIBRARY cudart ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
+    enable_language(CUDA)
+    include_directories( ${PROJECT_SOURCE_DIR}/ADEPT)
+    link_directories(${PROJECT_SOURCE_DIR}/ADEPT/build/adept)
+ 	message(STATUS "Cuda found...")
+     message(STATUS "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
+     message(STATUS "${CUDART_LIBRARY}")
+     target_include_directories(pastis PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+     target_link_libraries(pastis PUBLIC ${CUDART_LIBRARY})
 
-# ADEPT
-target_link_libraries(pastis PUBLIC adept_lib_shared)
+     # ADEPT
+     target_link_libraries(pastis PUBLIC adept_lib_shared)
+ else()
+     message("NOT BUILDING ADEPT, CUDA MISSING!")
+ endif()
 
 if(OPENMP_FOUND OR OpenMP_CXX_FOUND)
     # Set THREADED if OpenMP is found

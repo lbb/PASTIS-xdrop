@@ -1,5 +1,7 @@
+#ifdef ADEPT_ENABLED
 #include <cuda_runtime_api.h>
 #include <nvml.h>
+#endif
 #include <omp.h>
 #include <sched.h>
 
@@ -9,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #include "CombBLAS/CombBLAS.h"
 
@@ -50,7 +53,9 @@ set_thd_aff
 	}
 
 	int ndevices = 0;
+#ifdef ADEPT_ENABLED
 	cudaGetDeviceCount(&ndevices);
+#endif
 
 	// if (parops->g_rank == 0)
 	// 	cout << "#threads per task " << nthds
@@ -96,7 +101,6 @@ set_thd_aff
 	}
 	////////////////////////////////////////////////////////////////////////////
 }
-
 
 
 int
@@ -272,9 +276,13 @@ parse_args
     	params.aln_seqan_xdrop =
 			result[pastis::CMD_OPTION_XDROP_ALIGN].as<int>();
 	}
-  
+
   	if (result.count(pastis::CMD_OPTION_GPUBSW_ALIGN))
+ #ifdef ADEPT_ENABLED 
 		params.pw_aln = pastis::params_t::PwAln::ALN_ADEPT_GPUBSW;
+#else
+	throw std::runtime_error("Not build with ADEPT");
+#endif
 
   	if (result.count(pastis::CMD_OPTION_ALPH))
 	{

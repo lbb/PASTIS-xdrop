@@ -1,5 +1,5 @@
 // Created by Saliya Ekanayake on 2019-09-03.
-
+#ifdef ADEPT_ENABLED
 #include <algorithm>
 #include <thread>
 #include <utility>
@@ -529,3 +529,4 @@ AdeptBSWAligner::aln_batch_ovlp
 	
 }
 
+#endif

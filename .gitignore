@@ -8,6 +8,7 @@
 
 # Build results
 
+build/
 [Dd]ebug/
 [Rr]elease/
 [Aa]san/

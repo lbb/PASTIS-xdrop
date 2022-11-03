@@ -1,5 +1,6 @@
 #pragma once
 
+#ifdef ADEPT_ENABLED
 #include <string>
 #include <vector>
 
@@ -117,3 +118,4 @@ public:
 	
 }
 
+#endif

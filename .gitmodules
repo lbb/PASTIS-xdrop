@@ -9,3 +9,9 @@
 [submodule "ADEPT"]
 	path = ADEPT
 	url = https://github.com/mgawan/ADEPT
+[submodule "ipuma-lib"]
+	path = ipuma-lib
+	url = https://github.com/xiamaz/ipuma-lib.git
+[submodule "build/plog"]
+	path = build/plog
+	url = git@github.com:SergiusTheBest/plog.git
