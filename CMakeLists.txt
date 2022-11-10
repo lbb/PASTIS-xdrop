@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 project(pastis LANGUAGES C CXX)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 include_directories("plog/include")
 include_directories(

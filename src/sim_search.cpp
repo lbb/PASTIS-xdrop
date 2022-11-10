@@ -129,7 +129,7 @@ mult_aln_bl_idx
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
 		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
-			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext, params.klength, params.seed_count);
 
 		parops->tp->start_timer("construct-seqs");
 		
@@ -352,7 +352,7 @@ mult_aln_bl_idx_ovlp
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
 		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
-			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext, params.klength, params.seed_count);
 
 		parops->tp->start_timer("construct-seqs");
 
@@ -576,7 +576,7 @@ mult_aln_bl_trg
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
 		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
-			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext, params.klength, params.seed_count);
 
 				
 		parops->tp->start_timer("construct-seqs");
@@ -793,7 +793,7 @@ mult_aln_bl_trg_ovlp
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
 		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
-			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext, params.klength, params.seed_count);
 				
 		parops->tp->start_timer("construct-seqs");
 		
@@ -1011,7 +1011,7 @@ mult_aln
 			pwa = new AdeptBSWAligner(params.gap_open, params.gap_ext);
 #endif
 		else if (params.pw_aln == params_t::PwAln::ALN_IPUMA)
-			pwa = new IPumaAligner(params.gap_open, params.gap_ext);
+			pwa = new IPumaAligner(params.gap_open, params.gap_ext, params.klength, params.seed_count);
 
 		parops->tp->start_timer("sim:construct_seqs");
 

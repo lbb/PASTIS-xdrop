@@ -65,6 +65,7 @@ params_t
 	PwAln		pw_aln;
 	int			aln_seqan_banded_hw;
 	int			aln_seqan_xdrop;
+	int			aln_ipuma_xdrop;
 	uint64_t	aln_batch_sz;
 	double 		aln_cov_thr;	// alignment cov threshold
 	int			aln_ani_thr;	// alignment ANI threshold

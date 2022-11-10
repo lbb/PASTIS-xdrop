@@ -1,13 +1,25 @@
 #!/bin/bash
+
 #SBATCH -p ipuq    # partition (queue)
 #SBATCH -N 1 # number of nodes
 #SBATCH -n 81 # number of cores
 #SBATCH -t 1-1:00 # time (D-HH:MM)
-#    #SBATCH --exclusive
+#   #SBATCH --exclusive
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=luk@simula.no
-#SBATCH -o slurm.%N.%j.out # STDOUT
-#SBATCH -e slurm.%N.%j.err # STDERR
+#SBATCH -o slurm.log # STDOUT
+
+# #SBATCH -p milanq    # partition (queue)
+# #SBATCH -N 1 # number of nodes
+# #SBATCH --cpus-per-task 128
+# #SBATCH -o milan.log # STDOUT
+
+
+
+
+export OMP_NUM_THREADS=81
+export OMP_PROC_BIND=true
+export OMP_DISPLAY_ENV=true
 
 ulimit -s 10240
 mkdir -p ~/output/ipuq
@@ -15,6 +27,9 @@ mkdir -p ~/output/ipuq
 module purge
 
 source env.source
+
+set -euo pipefail
+pushd build/ && make -j$(nproc) && popd
 
 export OMPI_MCA_opal_common_ucx_opal_mem_hooks=1
 export OMPI_MCA_pml_ucx_verbose=100
@@ -32,12 +47,21 @@ mkdir -p ./bin/codelets
 cp ./build/bin/codelets/algoipu.gp ./bin/codelets/algoipu.gp
 cd ./build/
 
+set -x
+
+# DS=/home/lukb/git/PASTIS-xdrop/portal.nersc.gov/project/m1982/PASTIS/metaclust50_1000seq.fasta; N=1000;
+# DS=/home/lukb/git/PASTIS-xdrop/portal.nersc.gov/project/m1982/PASTIS/metaclust_50-0.1M.fasta; N=100000;
+DS=/home/lukb/git/PASTIS-xdrop/portal.nersc.gov/project/m1982/PASTIS/metaclust_50-0.5M.fasta; N=500000;
+# DS=/home/lukb/git/PASTIS-xdrop/portal.nersc.gov/project/m1982/PASTIS/metaclust_50-1M.fasta; N=1000000;
+# DS=/home/lukb/git/PASTIS-xdrop/portal.nersc.gov/project/m1982/PASTIS/metaclust_50-5M.fasta; N=5000000;
+
+lscpu
 
 # IPU
-srun --mpi=pmi2 -n $SLURM_NTASKS --ntasks 1 -- \
-	./pastis -i /global/D1/projects/ipumer/datasets/metaclust/metaclust50_500K.fasta -c 500000 --af sim_mat.mtx --ckthr 1 --ipuma
+srun --mpi=pmi2 -n $OMP_NUM_THREADS --ntasks 1 -- \
+	./pastis -i "$DS" -c "$N" --af sim_mat.mtx --ckthr 1 --ipuma 49 -g -2 --sc 2 --stats
+
+# srun --mpi=pmi2 -n $OMP_NUM_THREADS --ntasks 1 -- \
+# 	./pastis -i "$DS" -c "$N" --af sim_mat.mtx --ckthr 1 --sxa 49 -g -2 --sc 2 --stats
 
 
-# CPU
-# srun --mpi=pmi2 -n $SLURM_NTASKS --ntasks 1 -- \
-#	./pastis -i /global/D1/projects/ipumer/datasets/metaclust/metaclust50_500K.fasta -c 500000 --af sim_mat_cpu500k.mtx --ckthr 1 --sfa

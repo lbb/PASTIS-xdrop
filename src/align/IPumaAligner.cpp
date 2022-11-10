@@ -1,19 +1,18 @@
 #include "../../inc/align/IPumaAligner.hpp"
 
-
-#include <iostream>
-#include <fstream>
-
-
 #include <algorithm>
-#include <utility>
-
+#include <fstream>
+#include <functional>
+#include <iostream>
 #include <set>
+#include <utility>
+#include <string_view>
 
 #include "../../inc/util.hpp"
+#include "../../ipuma-lib/src/swatlib/matrix.h"
+
 // #include "ipumultidriver.hpp"
 // #include "batch.hpp"
-
 
 using std::max;
 using std::min;
@@ -74,221 +73,281 @@ void IPumaAligner::construct_seqs(std::shared_ptr<DistFastaData> dfd) {
   }
 }
 
-std::tuple<int16_t, int16_t> convertPackedRange(int32_t packed) {
-  int16_t begin = packed & 0xffff;
-  int16_t end = packed >> 16;
-  return {begin, end};
-}
-
-struct Batch {
-        int startIndex;
-        int endIndex;
-        int numCmps;
-        int totalSize;
-        std::vector<int32_t> inputBuffer;
-        std::vector<int32_t> resultBuffer;
-        std::vector<int32_t> mappingBuffer;
-        ipu::batchaffine::Job* job = nullptr;
-        ~Batch() {
-          if (job != nullptr) {
-                  delete job;
-          }
-        }
-};
-
-using Batches = std::vector<Batch>;
-
-Batches createBatches(std::vector<std::string>& A, std::vector<std::string>& B, const int batchCmpLimit, const int batchDataLimit) {
-        if (A.size() != B.size()) {
-                throw std::runtime_error("Sizes of A and B are not equal");
-        }
-        Batches batches;
-        int numCmps = 0;
-        int totalSize = 0;
-        int batchBegin = 0;
-        for (int i = 0; i < A.size(); ++i) {
-                const auto alen = A[i].size();
-                const auto blen = B[i].size();
-
-                if ((numCmps + 1 < batchCmpLimit) && (totalSize + alen + blen < batchDataLimit)) {
-                        numCmps++;
-                        totalSize += alen + blen;
-                } else {
-                        batches.push_back({.startIndex = batchBegin, .endIndex = batchBegin + numCmps, .numCmps = numCmps, .totalSize = totalSize});
-
-                        batchBegin += numCmps;
-                        numCmps = 1;
-                        totalSize = alen + blen;
-                }
-        }
-        if (numCmps > 0) {
-                batches.push_back({.startIndex = batchBegin, .endIndex = batchBegin + numCmps, .numCmps = numCmps, .totalSize = totalSize});
-        }
-
-        // PLOGD.printf("Created %d batches for a total of %d comparisons.", batches.size(), A.size());
-        return batches;
-}
-
-void IPumaAligner::aln_batch(std::tuple<uint64_t, uint64_t, CommonKmerLight *> *mattuples, uint64_t beg, uint64_t end, uint64_t bl_roffset, uint64_t bl_coffset, const params_t &params) {
+void IPumaAligner::aln_batch(
+    std::tuple<uint64_t, uint64_t, CommonKmerLoc *> *mattuples,
+    uint64_t beg,
+    uint64_t end,
+    uint64_t bl_roffset,
+    uint64_t bl_coffset,
+    const params_t &params) {
   parops->tp->start_timer("sim:align_pre");
 
   uint64_t npairs = end - beg;
-  vector<string> seqs_q(npairs);  // queries - shorter seqs
-  vector<string> seqs_r(npairs);  // refs - longer seqs
-  uint64_t max_rlen = 0;
-  uint64_t max_qlen = 0;
+  vector<string> seqs_V(npairs);    // queries - shorter seqs
+  vector<string> seqs_H(npairs);    // refs - longer seqs
+
+  // std::vector<ipu::MultiComparison> comparisons(npairs);
 
   int numThreads = 1;
 #ifdef THREADED
-  #pragma omp parallel
+#pragma omp parallel
   {
     numThreads = omp_get_num_threads();
     omp_set_num_threads(numThreads);
   }
 #endif
 
-#pragma omp parallel for reduction(max : max_rlen, max_qlen)
-  for (uint64_t i = beg; i < end; ++i) {
-    uint64_t lr = std::get<0>(mattuples[i]);
-    uint64_t lc = std::get<1>(mattuples[i]);
-    assert(lr + bl_roffset < rseqs_.size() && lc + bl_coffset < cseqs_.size());
-    string &rseq = rseqs_[lr + bl_roffset];
-    string &cseq = cseqs_[lc + bl_coffset];
-    if (rseq.size() < cseq.size()) {
-      seqs_q[i - beg] = rseq;
-      seqs_r[i - beg] = cseq;
+  PLOGI.printf("seed_cnt = %d", seed_cnt);
+  PLOGI.printf("seed_len = %d", seed_len);
+  PLOGI.printf("npairs = %d", npairs);
+  if (seed_cnt != NSEEDS) {
+    std::cerr << "unsupported seed coutn set " << std::endl;
+  }
+
+  PLOGW << "Seed Length" << seed_len;
+
+  std::vector<uint64_t> colstartrange;
+  int lastcol = -1;
+  size_t totalDim = 0;
+  for (auto i = 0; i < npairs; i++) {
+    // uint64_t lr = std::get<0>(mattuples[beg + i]);
+    uint64_t lr = std::get<0>(mattuples[beg + i]);
+    uint64_t lc = std::get<1>(mattuples[beg + i]);
+    totalDim = max(totalDim, max(lc, lr));
+    if (lc != lastcol) {
+      colstartrange.push_back(i);
+      lastcol = lc; 
+    }
+    // colstartrange.push_back(i);
+  }
+  totalDim += 1;
+
+
+
+  std::vector<std::string_view> sequences_fake(npairs * 2);
+
+  std::vector<std::string_view> sequences(totalDim * 2);
+  for (int i = 0; i < totalDim; i++) {
+    sequences[i] = rseqs_[i + bl_roffset];
+    sequences[totalDim+i] = cseqs_[i + bl_coffset];
+  }
+
+
+  // Prepare sequences
+
+ auto getRseqI = [&](int i) {
+   return i;
+ };
+
+ auto getCseqI = [&](int i) {
+  return totalDim + i;
+ };
+
+
+// const auto maxbatch_size = ALGOCONFIG.maxComparisonsPerVertex/2 - 1;
+const auto maxbatch_size = 1;
+
+PLOGF << "maxbatch size: " << maxbatch_size;
+std::vector<int> hist(maxbatch_size, 0);
+std::vector<ipu::MultiComparison> comparisons;
+auto cnt_comparisons = 0;
+
+swatlib::TickTock multibatch_timer;
+multibatch_timer.tick();
+// #pragma omp parallel for 
+  // for (uint64_t i = 0; i < npairs; ++i) {
+  for (uint64_t colix = 0; colix < colstartrange.size(); colix++) {
+    
+    auto col = std::get<1>(mattuples[beg + colstartrange[colix]]);
+    std::vector<ipu::Comparison> tmpcmps;
+    auto seqstore = 0;
+
+    for (uint64_t i = colstartrange[colix]; i < npairs; ++i) {
+      // Start here for ocls 
+      CommonKmerLoc *ckl = std::get<2>(mattuples[beg + i]);
+      uint64_t lr = std::get<0>(mattuples[beg + i]);
+      uint64_t lc = std::get<1>(mattuples[beg + i]);
+      if (lc != col) {break;}
+      // assert(lr + bl_roffset < rseqs_.size() && lc + bl_coffset < cseqs_.size());
+
+
+      int seeds[2][2];
+      for (int cnt = 0; cnt < seed_cnt; ++cnt) {
+        ushort l_row_seed_start_offset = (cnt == 0) ? ckl->first.first : ckl->second.first;
+        ushort l_col_seed_start_offset = (cnt == 0) ? ckl->first.second : ckl->second.second;
+        seeds[cnt][0] = l_col_seed_start_offset;
+        seeds[cnt][1] = l_row_seed_start_offset;
+      }
+
+      if (sequences[getRseqI(lr)].size() + seqstore + sequences[getCseqI(lc)].size() >= ALGOCONFIG.vertexBufferSize || tmpcmps.size() >= maxbatch_size) {
+          comparisons.emplace_back(tmpcmps, seed_len);
+          hist[tmpcmps.size() - 1] += 1;
+          tmpcmps.resize(0);
+          seqstore = 0;
+      }
+
+      seqstore += sequences[getCseqI(lc)].size();
+      cnt_comparisons += NSEEDS;
+
+      sequences_fake[i * 2] = sequences[getCseqI(lc)];
+      sequences_fake[i * 2 + 1] = sequences[getRseqI(lr)];
+      tmpcmps.push_back({
+        i,
+        i * 2,
+        sequences[getCseqI(lc)].size(), 
+        i * 2 + 1,
+        sequences[getRseqI(lr)].size(), 
+        {{{seeds[0][0], seeds[0][1]}, {seeds[1][0], seeds[1][1]}}},
+        0
+      });
+
+      // tmpcmps.push_back({
+        // i,
+        // getCseqI(lc),
+        // sequences[getCseqI(lc)].size(), 
+        // getRseqI(lr),
+        // sequences[getRseqI(lr)].size(), 
+        // {{{seeds[0][0], seeds[0][1]}, {seeds[1][0], seeds[1][1]}}},
+        // 0
+      // });
+    }
+    if (tmpcmps.size() != 0) {
+      comparisons.emplace_back(tmpcmps, seed_len);
+      hist[tmpcmps.size() - 1] += 1;
+      tmpcmps.resize(0);
+    }
+  }
+  multibatch_timer.tock();
+  PLOGI << "MultiBatching took [ms]: " << multibatch_timer.duration();
+  PLOGI << "Sigular comparison count: " << cnt_comparisons;
+  PLOGD << "We got MultiComparison: " << comparisons.size();
+  for (size_t i = 0; i < hist.size(); i++) {
+    PLOGD.printf("Bucket %5d has %7d entries.", i + 1, hist[i]);
+  }
+  parops->info("prepare batches");
+  parops->info("prepare batches");
+
+  // std::vector<ipu::partition::BatchMapping> mappings;
+  auto &cmps = comparisons;
+  auto &seqs = sequences_fake;
+  // {
+  //   ofstream myfile;
+  //   myfile.open ("cmps.txt");
+  //   myfile << json(cmps).dump() << std::endl;
+  //   myfile.close();
+  // }
+  // {
+  //   ofstream myfile;
+  //   myfile.open ("seqs.txt");
+  //   myfile << json(seqs).dump() << std::endl;
+  //   myfile.close();
+  // }
+
+  /////////////////////////////////////////////////////////////////////////////
+  // RUN BATCHES
+  /////////////////////////////////////////////////////////////////////////////
+
+
+  // std::vector<ipu::Batch> batches;
+  swatlib::TickTock mapping_timer;
+  mapping_timer.tick();
+  PLOGI << "Use multicomparisons for creating batches";
+  auto mappings = ipu::partition::mapBatches(ALGOCONFIG, seqs, cmps);
+  // batches = ipu::create_batches(seqs, mcmps, config.ipuconfig, config.swconfig);
+  mapping_timer.tock();
+  PLOGI << "Mapping took [ms]: " << mapping_timer.duration();
+
+  std::vector<ipu::batchaffine::Job *> jobs(mappings.size());
+  std::vector<ipu::Batch> batches(mappings.size());
+  bool lazyGeneration = true;
+
+  if (mappings.size() > 750 || lazyGeneration) {
+    lazyGeneration = true;
+    PLOGE << "Generate batches lazy, as batches " << mappings.size();
+  }
+
+  if (!lazyGeneration) {
+    swatlib::TickTock batch_timer;
+    batch_timer.tick();
+#pragma omp parallel for
+    for (int i = 0; i < mappings.size(); ++i) {
+      batches[i] = ipu::create_batch(mappings[i], seqs, ALGOCONFIG, SW_CONFIGURATION);
+    }
+    batch_timer.tock();
+    PLOGI << "Batch copies took [ms]: " << batch_timer.duration();
+  }
+
+  vector<int> scorepairs(npairs, 0);
+  swatlib::TickTock align_timer;
+  int64_t gcells = 0;
+  int progress = 0;
+
+  align_timer.tick();
+#pragma omp parallel for
+  for (int i = 0; i < mappings.size(); ++i) {
+    ipu::Batch batch;
+    if (lazyGeneration) {
+      PLOGW << "lazy generated batch";
+      batch = ipu::create_batch(mappings[i], seqs, ALGOCONFIG, SW_CONFIGURATION);
     } else {
-      seqs_q[i - beg] = cseq;
-      seqs_r[i - beg] = rseq;
+      batch = std::move(batches[i]);
+    }
+    PLOGW << batch.inputs.size();
+    jobs[i] = driver_algo->async_submit(&batch);
+    PLOGW << "submitted job";
+    driver_algo->blocking_join(*jobs[i]);
+
+#pragma omp critical
+    {
+      progress++;
+      gcells += batch.cellCount;
+      PLOGI << "Received batch " << progress << " / " << jobs.size();
     }
 
-    max_rlen = max(max_rlen, seqs_r[i - beg].size());
-    max_qlen = max(max_qlen, seqs_q[i - beg].size());
+    auto result = batch.get_result();
+    delete jobs[i];
+    // for (int ii = 0; ii < batch.origin_comparison_index.size(); ++ii) {
+    //   auto [orig_i, orig_seed] = ipu::unpackOriginIndex(batch.origin_comparison_index[ii]);
+    //   if (orig_i >= 0) {
+    //     int lpartScore = result.a_range_result[ii];
+    //     int rpartScore = result.b_range_result[ii];
+    //     // PLOGF << orig_i << ":" << batch.origin_comparison_index[i] << " " << lpartScore << " " << rpartScore;
+    //     scorepairs[orig_i] = std::max(lpartScore + rpartScore + SW_CONFIGURATION.seedLength, scorepairs[orig_i]);
+    //   }
+    // }
   }
 
-  parops->info("prepare batches");
-  // if (driver_algo == nullptr) {
-  //   init.join();
-  // }
-  const auto inputBufferSize = driver_algo->algoconfig.getInputBufferSize32b();
-  const auto mappingBufferSize = driver_algo->algoconfig.getTotalNumberOfComparisons();
-  const auto resultBufferSize = driver_algo->algoconfig.getTotalNumberOfComparisons() * 3;
+  align_timer.tock();
+  PLOGI << "GCells: " << gcells;
+  PLOGI << "Align time took [ms]: " << align_timer.duration();
 
-  const int batchCmpLimit = driver_algo->algoconfig.getTotalNumberOfComparisons() - driver_algo->algoconfig.maxBatches;
-  const int batchDataLimit = driver_algo->algoconfig.getTotalBufsize32b() * 4 - driver_algo->algoconfig.bufsize * 100;
-
-  auto bs = createBatches(seqs_q, seqs_r, batchCmpLimit, batchDataLimit);
-
-  auto prepare_batch = [&](Batch& batch) {
-          batch.inputBuffer.resize(inputBufferSize);
-          batch.mappingBuffer.resize(mappingBufferSize);
-          batch.resultBuffer.resize(resultBufferSize);
-          driver_algo->prepare_remote(driver_algo->config, driver_algo->algoconfig, 
-            {seqs_q.begin()+batch.startIndex, seqs_q.begin()+batch.endIndex},
-            {seqs_r.begin()+batch.startIndex, seqs_r.begin()+batch.endIndex},
-            &*batch.inputBuffer.begin(),
-            &*batch.inputBuffer.end(),
-            batch.mappingBuffer.data()
-          );
-  };
-
-  parops->info("prepare batches parallel loop");
-  #pragma omp parallel for
-  for (size_t i = 0; i < bs.size(); i++) {
-      prepare_batch(bs[i]);
-  }
-  
-
-  parops->tp->stop_timer("sim:align_pre");
-
-// {
-//   ofstream myfile;
-//   myfile.open ("As.txt", ios::app);
-//   for (auto &&i : seqs_r) {
-//     myfile << i << '\n';
-//   }
-//   myfile.close();
-// }
-// {
-//   ofstream myfile;
-//   myfile.open ("Bs.txt", ios::app);
-//   for (auto &&i : seqs_q) {
-//     myfile << i << '\n';
-//   }
-//   myfile.close();
-// }
-
-  parops->info("start algo");
-  parops->tp->start_timer("sim:align");
-  for (size_t i = 0; i < bs.size(); i++) {
-    bs[i].job = driver_algo->async_submit_prepared_remote_compare(
-      &*bs[i].inputBuffer.begin(),
-      &*bs[i].inputBuffer.end(),
-      &*bs[i].resultBuffer.begin(),
-      &*bs[i].resultBuffer.end()
-      );
-  }
-  parops->info("join algo");
-  for (size_t i = 0; i < bs.size(); i++) {
-    driver_algo->blocking_join_prepared_remote_compare(*bs[i].job);
-  }
-  // // driver_algo->compare_local(seqs_q, seqs_r);
-  // auto [scores, r_range_result, q_range_result] = driver_algo->get_result();
+  /////////////////////////////////////////////////////////////////////////////
+  // END RUN BATCHES
+  /////////////////////////////////////////////////////////////////////////////
 
   // parops->tp->start_timer
   parops->tp->stop_timer("sim:align");
-
-  // This seems to be the same block ignore for now
-
   parops->tp->start_timer("sim:align_post");
 
-
-  parops->info("iter results");
-  for (size_t j = 0; j < bs.size(); j++) {
-    vector<int32_t> q_range_result(driver_algo->algoconfig.getTotalNumberOfComparisons());
-    vector<int32_t> r_range_result(driver_algo->algoconfig.getTotalNumberOfComparisons());
-    vector<int32_t> scores(driver_algo->algoconfig.getTotalNumberOfComparisons());
-      driver_algo->transferResults(
-        &*bs[j].resultBuffer.begin(),
-        &*bs[j].resultBuffer.end(),
-        &*bs[j].mappingBuffer.begin(),
-        &*bs[j].mappingBuffer.end(),
-        &*scores.begin(),
-        &*scores.end(),
-        &*q_range_result.begin(),
-        &*q_range_result.end(),
-        &*r_range_result.begin(),
-        &*r_range_result.end()
-      );
-
 #pragma omp for
-    for (uint64_t i = 0; i < bs[j].numCmps; ++i) {
-      int len_r = seqs_r[ bs[j].startIndex+i].size();
-      int len_q = seqs_q[ bs[j].startIndex+i].size();
-      auto [ref_begin, ref_end] = convertPackedRange(r_range_result[i]);
-      auto [query_begin, query_end] = convertPackedRange(q_range_result[i]);
+  for (uint64_t i = 0; i < npairs; i++) {
+    // int len_r_left = seqs_H[i * 2].size();
+    // int len_r_right = seqs_H[i * 2 + 1].size();
+    // int len_q_left = seqs_V[i * 2].size();
+    // int len_q_right = seqs_V[i * 2 + 1].size();
 
-      int alen_r = ref_end - ref_begin;
-      int alen_q = query_end - query_begin;
+    // int id_left = (double)scorepairs[i * 2] / min(len_r_left, len_q_left);
+    // int id_right = (double)scorepairs[i * 2 + 1] / min(len_r_right, len_q_right);
+    CommonKmerLoc *ckl = std::get<2>(mattuples[beg + i]);
 
-      double cov_r = (double)(alen_r) / len_r;
-      double cov_q = (double)(alen_q) / len_q;
-
-      if (max(cov_r, cov_q) >= params.aln_cov_thr)  // coverage constraint
-      {
-        CommonKmerLight *ckl = std::get<2>(mattuples[beg + bs[j].startIndex + i]);
-        ckl->score_aln = (float)(scores[i]) /
-                         (float)min(len_r, len_q);
-      }
-    }
+    ckl->score_aln = 0;  // (float)(id_left + id_right) / 2.0;
   }
-
   parops->tp->stop_timer("sim:align_post");
 }
 
 void IPumaAligner::construct_seqs_bl(std::shared_ptr<DistFastaData> dfd) {
   parops->logger->log("construct_seqs_bl not implemented");
-  exit(1);
+  // exit(1);
 }
 
 }  // namespace pastis

@@ -165,7 +165,7 @@ parse_args
      cxxopts::value<string>())
 	(pastis::CMD_OPTION_PB, pastis::CMD_OPTION_DESCRIPTION_PB)
 	(pastis::CMD_OPTION_STATS, pastis::CMD_OPTION_DESCRIPTION_STATS)
-	(pastis::CMD_OPTION_IPUMA, pastis::CMD_OPTION_DESCRIPTION_IPUMA);
+	(pastis::CMD_OPTION_IPUMA, pastis::CMD_OPTION_DESCRIPTION_IPUMA, cxxopts::value<int>());
 
 	// defaults
 	params.write_overlaps	   = false;
@@ -286,6 +286,7 @@ parse_args
 #endif
   	if (result.count(pastis::CMD_OPTION_IPUMA)) {
 		params.pw_aln = pastis::params_t::PwAln::ALN_IPUMA;
+		params.aln_ipuma_xdrop = result[pastis::CMD_OPTION_IPUMA].as<int>();
 	}
 
   	if (result.count(pastis::CMD_OPTION_ALPH))
@@ -549,10 +550,9 @@ main
 
 	if (params.pw_aln == pastis::params_t::PwAln::ALN_NONE ||
 		params.pw_aln == pastis::params_t::PwAln::ALN_SEQAN_FULL ||
-		params.pw_aln == pastis::params_t::PwAln::ALN_ADEPT_GPUBSW ||
-		params.pw_aln == pastis::params_t::PwAln::ALN_IPUMA)
+		params.pw_aln == pastis::params_t::PwAln::ALN_ADEPT_GPUBSW)
 		pastis::compute_sim_mat<pastis::CommonKmerLight>(params);
-	else if (params.pw_aln == pastis::params_t::PwAln::ALN_SEQAN_XDROP)
+	else if (params.pw_aln == pastis::params_t::PwAln::ALN_SEQAN_XDROP || params.pw_aln == pastis::params_t::PwAln::ALN_IPUMA)
 		pastis::compute_sim_mat<pastis::CommonKmerLoc>(params);
 	
 	parops->tp->stop_timer("total");
