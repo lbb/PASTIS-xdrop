@@ -124,7 +124,7 @@ void IPumaAligner::aln_batch(
 
 
 
-  std::vector<std::string_view> sequences_fake(npairs * 2);
+  // std::vector<std::string_view> sequences_fake(npairs * 2);
 
   std::vector<std::string_view> sequences(totalDim * 2);
   for (int i = 0; i < totalDim; i++) {
@@ -144,8 +144,8 @@ void IPumaAligner::aln_batch(
  };
 
 
-// const auto maxbatch_size = ALGOCONFIG.maxComparisonsPerVertex/2 - 1;
-const auto maxbatch_size = 1;
+const auto maxbatch_size = ALGOCONFIG.maxComparisonsPerVertex/2 - 1;
+// const auto maxbatch_size = 1;
 
 PLOGF << "maxbatch size: " << maxbatch_size;
 std::vector<int> hist(maxbatch_size, 0);
@@ -189,27 +189,27 @@ multibatch_timer.tick();
       seqstore += sequences[getCseqI(lc)].size();
       cnt_comparisons += NSEEDS;
 
-      sequences_fake[i * 2] = sequences[getCseqI(lc)];
-      sequences_fake[i * 2 + 1] = sequences[getRseqI(lr)];
+      // sequences_fake[i * 2] = sequences[getCseqI(lc)];
+      // sequences_fake[i * 2 + 1] = sequences[getRseqI(lr)];
+      // tmpcmps.push_back({
+      //   i,
+      //   i * 2,
+      //   sequences[getCseqI(lc)].size(), 
+      //   i * 2 + 1,
+      //   sequences[getRseqI(lr)].size(), 
+      //   {{{seeds[0][0], seeds[0][1]}, {seeds[1][0], seeds[1][1]}}},
+      //   0
+      // });
+
       tmpcmps.push_back({
         i,
-        i * 2,
+        getCseqI(lc),
         sequences[getCseqI(lc)].size(), 
-        i * 2 + 1,
+        getRseqI(lr),
         sequences[getRseqI(lr)].size(), 
         {{{seeds[0][0], seeds[0][1]}, {seeds[1][0], seeds[1][1]}}},
         0
       });
-
-      // tmpcmps.push_back({
-        // i,
-        // getCseqI(lc),
-        // sequences[getCseqI(lc)].size(), 
-        // getRseqI(lr),
-        // sequences[getRseqI(lr)].size(), 
-        // {{{seeds[0][0], seeds[0][1]}, {seeds[1][0], seeds[1][1]}}},
-        // 0
-      // });
     }
     if (tmpcmps.size() != 0) {
       comparisons.emplace_back(tmpcmps, seed_len);
@@ -229,7 +229,7 @@ multibatch_timer.tick();
 
   // std::vector<ipu::partition::BatchMapping> mappings;
   auto &cmps = comparisons;
-  auto &seqs = sequences_fake;
+  auto &seqs = sequences;
   // {
   //   ofstream myfile;
   //   myfile.open ("cmps.txt");
